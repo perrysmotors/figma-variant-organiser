@@ -1,0 +1,320 @@
+// This plugin organises the selected component set into a tidy grid.
+
+// The 'input' event listens for text change in the Quick Actions box after a plugin is 'Tabbed' into.
+figma.parameters.on(
+    "input",
+    ({ query, parameters, result }: ParameterInputEvent) => {
+        const selection = getFilteredSelection()
+
+        if (selection.length !== 1) {
+            result.setError("⚠️ Select a single component set first")
+            return
+        }
+
+        const componentSet = selection[0] as ComponentSetNode
+        const variantProps = componentSet.variantGroupProperties
+        const propsList = Object.keys(variantProps)
+
+        if (propsList.length < 2) {
+            result.setError("⚠️ The conponent must have more than one property")
+            return
+        }
+
+        const suggestions = propsList.filter(
+            (item) =>
+                item.toLowerCase().includes(query.toLowerCase()) &&
+                item !== parameters["column"] &&
+                item !== parameters["row"]
+        )
+
+        result.setSuggestions(suggestions)
+    }
+)
+
+// When the user presses Enter after inputting all parameters, the 'run' event is fired.
+figma.on("run", async ({ parameters }: RunEvent) => {
+    await loadFonts()
+    if (parameters) {
+        await startPluginWithParameters(parameters)
+    }
+})
+
+function startPluginWithParameters(parameters: ParameterValues) {
+    const selection = getFilteredSelection()
+    if (selection.length !== 1) {
+        figma.notify("⚠️ Select a single component set first")
+        figma.closePlugin()
+        return
+    }
+
+    // Get variants and variant properties from selected Component Set
+    const componentSet = selection[0] as ComponentSetNode
+    const variantProps = componentSet.variantGroupProperties
+    const variants = componentSet.children
+
+    // Check parameters match component properties
+    const match = Object.values(parameters).every((value) =>
+        Object.keys(variantProps).includes(value)
+    )
+    if (!match) {
+        figma.notify("⚠️ Chosen properties don't match component properties")
+        figma.closePlugin()
+        return
+    }
+
+    // Set defaults for grid spacing
+    const spacing_subGrid = 24
+    const spacing_groups = 96
+
+    // Determine columns and rows in both sub-grid and horizontal groups
+    const columnProps_subGrid = variantProps[parameters["column"]].values
+    const rowProps_subGrid = variantProps[parameters["row"]].values
+    const columnProps_group =
+        parameters["hGroup"] && variantProps[parameters["hGroup"]].values
+
+    // Calculate grid sizing based on largest variant sizes (rounded up to sit on 8px grid)
+    const maxWidth =
+        Math.ceil(Math.max(...variants.map((element) => element.width)) / 8) * 8
+    const maxHeight =
+        Math.ceil(Math.max(...variants.map((element) => element.height)) / 8) *
+        8
+
+    const columnCount_subGrid = columnProps_subGrid.length
+    const rowCount_subGrid = rowProps_subGrid.length
+
+    const dx_subGrid = maxWidth + spacing_subGrid
+    const dy_subGrid = maxHeight + spacing_subGrid
+    const dx_group =
+        dx_subGrid * columnCount_subGrid - spacing_subGrid + spacing_groups
+    const dy_group =
+        dy_subGrid * rowCount_subGrid - spacing_subGrid + spacing_groups
+
+    // Seperate out properties used for vetical grouping
+    function getGroupProps(variant: ComponentNode) {
+        const props = variant.variantProperties
+
+        const {
+            [parameters["column"]]: columnProp,
+            [parameters["row"]]: rowProp,
+            ...groupProps
+        } = props
+
+        if (parameters["hGroup"]) {
+            delete groupProps[parameters["hGroup"]]
+        }
+        return groupProps
+    }
+
+    const groupPropsList = variants.map((variant: ComponentNode) =>
+        getGroupProps(variant)
+    )
+
+    // Calculate group numbers and sort according to order of props and values in Component Set
+    function getPropIdentifier([key, value]) {
+        const keyIndex = getPaddedIndex(key, Object.keys(variantProps))
+        const valueIndex = getPaddedIndex(value, variantProps[key].values)
+        return `${keyIndex}${valueIndex}`
+    }
+
+    function getObjectIdentifier(json) {
+        const obj = JSON.parse(json)
+        return Object.entries(obj)
+            .map((prop) => getPropIdentifier(prop))
+            .sort()
+            .toString()
+    }
+
+    const uniqueGroups = [
+        ...new Map(
+            groupPropsList.map((obj) => [JSON.stringify(obj), obj])
+        ).keys(),
+    ].sort((a, b) => {
+        const idA = getObjectIdentifier(a)
+        const idB = getObjectIdentifier(b)
+
+        if (idA < idB) {
+            return -1
+        }
+        if (idA > idB) {
+            return 1
+        }
+
+        // identifiers must be equal
+        return 0
+    })
+
+    // Layout variants in grid
+    variants.forEach((variant: ComponentNode) => {
+        const props = variant.variantProperties
+
+        const columnIndex_subGrid = columnProps_subGrid.indexOf(
+            props[parameters["column"]]
+        )
+        const rowIndex_subGrid = rowProps_subGrid.indexOf(
+            props[parameters["row"]]
+        )
+        const columnIndex_group = parameters["hGroup"]
+            ? columnProps_group.indexOf(props[parameters["hGroup"]])
+            : 0
+        const rowIndex_group = uniqueGroups.indexOf(
+            JSON.stringify(getGroupProps(variant))
+        )
+
+        variant.x =
+            columnIndex_subGrid * dx_subGrid +
+            columnIndex_group * dx_group +
+            spacing_subGrid
+        variant.y =
+            rowIndex_subGrid * dy_subGrid +
+            rowIndex_group * dy_group +
+            spacing_subGrid
+    })
+
+    // Resize Component Set
+    componentSet.layoutMode = "NONE"
+
+    const bottomRigthX = Math.max(
+        ...variants.map((child) => child.x + child.width)
+    )
+    const bottomRigthY = Math.max(
+        ...variants.map((child) => child.y + child.height)
+    )
+
+    componentSet.resizeWithoutConstraints(
+        bottomRigthX + spacing_subGrid,
+        bottomRigthY + spacing_subGrid
+    )
+
+    // Add labels
+    const labels_all = []
+    const labels_rowGroups = []
+    const labels_subGridRows = []
+
+    function createSubGridColumnLabels(groupIndex) {
+        columnProps_subGrid.forEach((prop, i) => {
+            const text = createText(prop)
+            labels_all.push(text)
+            text.x = dx_subGrid * i + dx_group * groupIndex
+        })
+    }
+
+    function createSubGridRowLabels(groupIndex) {
+        rowProps_subGrid.forEach((prop, i) => {
+            const text = createText(prop)
+            labels_all.push(text)
+            labels_subGridRows.push(text)
+            text.y =
+                dy_subGrid * i + dy_group * groupIndex + spacing_subGrid * 2
+        })
+    }
+
+    // Generate column labels
+    if (columnProps_group) {
+        columnProps_group.forEach((prop, i) => {
+            const text = createText(prop, 20, "Bold")
+            labels_all.push(text)
+            text.x = dx_group * i
+            text.y = -spacing_groups
+            createSubGridColumnLabels(i)
+        })
+    } else {
+        createSubGridColumnLabels(0)
+    }
+
+    // Generate row labels
+    if (uniqueGroups.length > 1) {
+        uniqueGroups.forEach((json, i) => {
+            const obj = JSON.parse(json)
+            const characters = Object.values(obj).toString()
+            const text = createText(characters, 20, "Bold")
+            text.y = dy_group * i + spacing_subGrid * 2
+            labels_all.push(text)
+            labels_rowGroups.push(text)
+            createSubGridRowLabels(i)
+        })
+    } else {
+        createSubGridRowLabels(0)
+    }
+
+    // Calculate offsets for row labels
+    const labelMaxWidth_rowGroups = Math.max(
+        ...labels_rowGroups.map((element) => element.width)
+    )
+    const labelMaxWidth_subGridRows = Math.max(
+        ...labels_subGridRows.map((element) => element.width)
+    )
+
+    // Place labels in group and position relative to component set
+    const componentSetIndex = componentSet.parent.children.indexOf(componentSet)
+    const groupNode = figma.group(
+        labels_all,
+        componentSet.parent,
+        componentSetIndex
+    )
+    groupNode.name = `${componentSet.name} - property labels`
+    groupNode.expanded = false
+    groupNode.x = componentSet.x + spacing_subGrid
+    groupNode.y =
+        componentSet.y -
+        spacing_subGrid * 2 -
+        (parameters["hGroup"] ? spacing_groups : 0)
+
+    // Offset row labels to left of component set
+    labels_rowGroups.forEach((label) => {
+        label.x =
+            label.x -
+            labelMaxWidth_rowGroups -
+            labelMaxWidth_subGridRows -
+            spacing_subGrid * 2 -
+            spacing_groups
+        label.y = label.y + spacing_subGrid
+    })
+    labels_subGridRows.forEach((label) => {
+        label.x = label.x - labelMaxWidth_subGridRows - spacing_subGrid * 2
+        label.y = label.y + spacing_subGrid
+    })
+
+    // Make sure to close the plugin when you're done. Otherwise the plugin will
+    // keep running, which shows the cancel button at the bottom of the screen.
+    figma.closePlugin()
+}
+
+function getFilteredSelection() {
+    return figma.currentPage.selection.filter(
+        (node) => node.type === "COMPONENT_SET"
+    )
+}
+
+function zeroPaddedNumber(num, max) {
+    const countLength = max.toString().length
+    return num.toString().padStart(countLength, "0")
+}
+
+function getPaddedIndex(item, arr) {
+    return zeroPaddedNumber(arr.indexOf(item), arr.length)
+}
+
+async function loadFonts() {
+    await Promise.all([
+        figma.loadFontAsync({ family: "Space Mono", style: "Regular" }),
+        figma.loadFontAsync({ family: "Space Mono", style: "Bold" }),
+    ])
+}
+
+function createText(
+    characters: string,
+    size: number = 16,
+    style: string = "Regular"
+) {
+    const text = figma.createText()
+    text.fontName = { family: "Space Mono", style: style }
+    text.characters = characters
+    text.fontSize = size
+    text.fills = [
+        {
+            type: "SOLID",
+            color: { r: 123 / 255, g: 97 / 255, b: 255 / 255 },
+        },
+    ]
+    return text
+}

@@ -1,0 +1,31 @@
+{
+  "name": "Variant Organiser",
+  "id": "1047796251364453654",
+  "api": "1.0.0",
+  "main": "code.js",
+  "editorType": [
+    "figma"
+  ],
+  "parameterOnly": true,
+  "parameters": [
+    {
+      "name": "Columns",
+      "key": "column",
+      "description": "Select column property for primary grid",
+      "allowFreeform": false
+    },
+    {
+      "name": "Rows",
+      "key": "row",
+      "description": "Select row property for primary grid",
+      "allowFreeform": false
+    },
+    {
+      "name": "Horizontal groups",
+      "key": "hGroup",
+      "description": "Select property for grouping grids horizontally",
+      "allowFreeform": false,
+      "optional": true
+    }
+  ]
+}
