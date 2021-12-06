@@ -12,11 +12,19 @@ figma.parameters.on(
         }
 
         const componentSet = selection[0] as ComponentSetNode
-        const variantProps = componentSet.variantGroupProperties
+
+        let variantProps
+        try {
+            variantProps = componentSet.variantGroupProperties
+        } catch (error) {
+            result.setError("⚠️ Resolve conflicting variants in order to continue")
+            return
+        }
+
         const propsList = Object.keys(variantProps)
 
         if (propsList.length < 2) {
-            result.setError("⚠️ The conponent must have more than one property")
+            result.setError("⚠️ The component must have more than one property")
             return
         }
 
@@ -49,9 +57,17 @@ function startPluginWithParameters(parameters: ParameterValues) {
 
     // Get variants and variant properties from selected Component Set
     const componentSet = selection[0] as ComponentSetNode
-    const variantProps = componentSet.variantGroupProperties
     const variants = componentSet.children
 
+    let variantProps
+        try {
+            variantProps = componentSet.variantGroupProperties
+        } catch (error) {
+            figma.notify("⚠️ Resolve conflicting variants in order to continue")
+            figma.closePlugin()
+            return
+        }
+    
     // Check parameters match component properties
     const match = Object.values(parameters).every((value) =>
         Object.keys(variantProps).includes(value)

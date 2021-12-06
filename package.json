@@ -1,7 +1,7 @@
 {
-  "name": "Variant-Grid-",
+  "name": "variant-organiser",
   "version": "1.0.0",
-  "description": "Your Figma plugin",
+  "description": "Automatically arranges variants in a grid and creates property labels",
   "main": "code.js",
   "scripts": {
     "build": "tsc -p tsconfig.json"
