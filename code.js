@@ -27,10 +27,17 @@ figma.parameters.on("input", ({ query, parameters, result }) => {
         return;
     }
     const componentSet = selection[0];
-    const variantProps = componentSet.variantGroupProperties;
+    let variantProps;
+    try {
+        variantProps = componentSet.variantGroupProperties;
+    }
+    catch (error) {
+        result.setError("⚠️ Resolve conflicting variants in order to continue");
+        return;
+    }
     const propsList = Object.keys(variantProps);
     if (propsList.length < 2) {
-        result.setError("⚠️ The conponent must have more than one property");
+        result.setError("⚠️ The component must have more than one property");
         return;
     }
     const suggestions = propsList.filter((item) => item.toLowerCase().includes(query.toLowerCase()) &&

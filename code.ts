@@ -12,7 +12,15 @@ figma.parameters.on(
         }
 
         const componentSet = selection[0] as ComponentSetNode
-        const variantProps = componentSet.variantGroupProperties
+
+        let variantProps
+        try {
+            variantProps = componentSet.variantGroupProperties
+        } catch (error) {
+            result.setError("⚠️ Resolve conflicting variants in order to continue")
+            return
+        }
+        
         const propsList = Object.keys(variantProps)
 
         if (propsList.length < 2) {
