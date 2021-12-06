@@ -61,8 +61,16 @@ function startPluginWithParameters(parameters) {
     }
     // Get variants and variant properties from selected Component Set
     const componentSet = selection[0];
-    const variantProps = componentSet.variantGroupProperties;
     const variants = componentSet.children;
+    let variantProps;
+    try {
+        variantProps = componentSet.variantGroupProperties;
+    }
+    catch (error) {
+        figma.notify("⚠️ Resolve conflicting variants in order to continue");
+        figma.closePlugin();
+        return;
+    }
     // Check parameters match component properties
     const match = Object.values(parameters).every((value) => Object.keys(variantProps).includes(value));
     if (!match) {
