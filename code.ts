@@ -16,7 +16,7 @@ figma.parameters.on(
         const propsList = Object.keys(variantProps)
 
         if (propsList.length < 2) {
-            result.setError("⚠️ The conponent must have more than one property")
+            result.setError("⚠️ The component must have more than one property")
             return
         }
 
