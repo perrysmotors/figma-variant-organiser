@@ -155,33 +155,44 @@ function startPluginWithParameters(parameters) {
     const bottomRigthX = Math.max(...variants.map((child) => child.x + child.width));
     const bottomRigthY = Math.max(...variants.map((child) => child.y + child.height));
     componentSet.resizeWithoutConstraints(bottomRigthX + spacing_subGrid, bottomRigthY + spacing_subGrid);
+    // Create frame to contain labels and match its size & position to component set
+    const componentSetIndex = componentSet.parent.children.indexOf(componentSet);
+    const labelsParentFrame = figma.createFrame();
+    componentSet.parent.insertChild(componentSetIndex, labelsParentFrame);
+    labelsParentFrame.x = componentSet.x;
+    labelsParentFrame.y = componentSet.y;
+    labelsParentFrame.resize(componentSet.width, componentSet.height);
+    labelsParentFrame.fills = [];
+    labelsParentFrame.name = `${componentSet.name} - property labels`;
+    labelsParentFrame.expanded = false;
+    labelsParentFrame.clipsContent = false;
     // Add labels
-    const labels_all = [];
     const labels_rowGroups = [];
     const labels_subGridRows = [];
     function createSubGridColumnLabels(groupIndex) {
         columnProps_subGrid.forEach((prop, i) => {
-            const text = createText(prop);
-            labels_all.push(text);
-            text.x = dx_subGrid * i + dx_group * groupIndex;
+            const label = createText(prop);
+            labelsParentFrame.appendChild(label);
+            label.x = dx_subGrid * i + dx_group * groupIndex + spacing_subGrid;
+            label.y = -spacing_subGrid * 2;
         });
     }
     function createSubGridRowLabels(groupIndex) {
         rowProps_subGrid.forEach((prop, i) => {
-            const text = createText(prop);
-            labels_all.push(text);
-            labels_subGridRows.push(text);
-            text.y =
-                dy_subGrid * i + dy_group * groupIndex + spacing_subGrid * 2;
+            const label = createText(prop);
+            labelsParentFrame.appendChild(label);
+            labels_subGridRows.push(label);
+            label.y =
+                dy_subGrid * i + dy_group * groupIndex + spacing_subGrid;
         });
     }
     // Generate column labels
     if (columnProps_group) {
         columnProps_group.forEach((prop, i) => {
-            const text = createText(prop, 20, "Bold");
-            labels_all.push(text);
-            text.x = dx_group * i;
-            text.y = -spacing_groups;
+            const label = createText(prop, 20, "Bold");
+            labelsParentFrame.appendChild(label);
+            label.x = dx_group * i + spacing_subGrid;
+            label.y = -spacing_groups - spacing_subGrid * 2;
             createSubGridColumnLabels(i);
         });
     }
@@ -193,10 +204,10 @@ function startPluginWithParameters(parameters) {
         uniqueGroups.forEach((json, i) => {
             const obj = JSON.parse(json);
             const characters = Object.values(obj).toString();
-            const text = createText(characters, 20, "Bold");
-            text.y = dy_group * i + spacing_subGrid * 2;
-            labels_all.push(text);
-            labels_rowGroups.push(text);
+            const label = createText(characters, 20, "Bold");
+            labelsParentFrame.appendChild(label);
+            label.y = dy_group * i + spacing_subGrid;
+            labels_rowGroups.push(label);
             createSubGridRowLabels(i);
         });
     }
@@ -206,29 +217,17 @@ function startPluginWithParameters(parameters) {
     // Calculate offsets for row labels
     const labelMaxWidth_rowGroups = Math.max(...labels_rowGroups.map((element) => element.width));
     const labelMaxWidth_subGridRows = Math.max(...labels_subGridRows.map((element) => element.width));
-    // Place labels in group and position relative to component set
-    const componentSetIndex = componentSet.parent.children.indexOf(componentSet);
-    const groupNode = figma.group(labels_all, componentSet.parent, componentSetIndex);
-    groupNode.name = `${componentSet.name} - property labels`;
-    groupNode.expanded = false;
-    groupNode.x = componentSet.x + spacing_subGrid;
-    groupNode.y =
-        componentSet.y -
-            spacing_subGrid * 2 -
-            (parameters["hGroup"] ? spacing_groups : 0);
     // Offset row labels to left of component set
     labels_rowGroups.forEach((label) => {
         label.x =
             label.x -
                 labelMaxWidth_rowGroups -
                 labelMaxWidth_subGridRows -
-                spacing_subGrid * 2 -
+                spacing_subGrid -
                 spacing_groups;
-        label.y = label.y + spacing_subGrid;
     });
     labels_subGridRows.forEach((label) => {
-        label.x = label.x - labelMaxWidth_subGridRows - spacing_subGrid * 2;
-        label.y = label.y + spacing_subGrid;
+        label.x = label.x - labelMaxWidth_subGridRows - spacing_subGrid;
     });
     // Make sure to close the plugin when you're done. Otherwise the plugin will
     // keep running, which shows the cancel button at the bottom of the screen.
