@@ -230,9 +230,28 @@ function startPluginWithParameters(parameters: ParameterValues) {
     const labels_rowGroups = []
     const labels_subGridRows = []
 
+    // Get list of boolean properties
+    const booleanPropNames = Object.entries(variantGroupProperties)
+        .filter((arr) => {
+            const values = arr[1]["values"]
+                .map((value) => value.toLowerCase())
+                .sort()
+            if (values.length !== 2) return false
+            return (
+                (values[0] === "off" && values[1] === "on") ||
+                (values[0] === "false" && values[1] === "true")
+            )
+        })
+        .map((arr) => arr[0])
+
+    // Include property names with boolean values to make labels clearer
+    function getLabelText(key, value) {
+        return booleanPropNames.includes(key) ? `${key}=${value}` : value
+    }
+
     function createSubGridColumnLabels(groupIndex) {
-        columnPropValues_subGrid.forEach((prop, i) => {
-            const label = createText(prop)
+        columnPropValues_subGrid.forEach((value, i) => {
+            const label = createText(getLabelText(parameters["column"], value))
             labelsParentFrame.appendChild(label)
             label.x = dx_subGrid * i + dx_group * groupIndex + spacing_subGrid
             label.y = -spacing_subGrid * 2
@@ -240,8 +259,8 @@ function startPluginWithParameters(parameters: ParameterValues) {
     }
 
     function createSubGridRowLabels(groupIndex) {
-        rowPropValues_subGrid.forEach((prop, i) => {
-            const label = createText(prop)
+        rowPropValues_subGrid.forEach((value, i) => {
+            const label = createText(getLabelText(parameters["row"], value))
             labelsParentFrame.appendChild(label)
             labels_subGridRows.push(label)
             label.y = dy_subGrid * i + dy_group * groupIndex + spacing_subGrid
@@ -250,8 +269,12 @@ function startPluginWithParameters(parameters: ParameterValues) {
 
     // Generate column labels
     if (columnPropValues_group) {
-        columnPropValues_group.forEach((prop, i) => {
-            const label = createText(prop, 20, "Bold")
+        columnPropValues_group.forEach((value, i) => {
+            const label = createText(
+                getLabelText(parameters["hGroup"], value),
+                20,
+                "Bold"
+            )
             labelsParentFrame.appendChild(label)
             label.x = dx_group * i + spacing_subGrid
             label.y = -spacing_groups - spacing_subGrid * 2
@@ -264,9 +287,10 @@ function startPluginWithParameters(parameters: ParameterValues) {
     // Generate row labels
     if (uniqueGroups.length > 1) {
         uniqueGroups.forEach((json, i) => {
-            const obj = JSON.parse(json)
-            const characters = Object.values(obj).toString()
-            const label = createText(characters, 20, "Bold")
+            const labelText = Object.entries(JSON.parse(json))
+                .map(([key, value]) => getLabelText(key, value))
+                .join(", ")
+            const label = createText(labelText, 20, "Bold")
             labelsParentFrame.appendChild(label)
             label.y = dy_group * i + spacing_subGrid
             labels_rowGroups.push(label)
