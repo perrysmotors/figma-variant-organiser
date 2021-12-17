@@ -13,22 +13,24 @@ figma.parameters.on(
 
         const componentSet = selection[0] as ComponentSetNode
 
-        let variantProps
+        let variantGroupProperties
         try {
-            variantProps = componentSet.variantGroupProperties
+            variantGroupProperties = componentSet.variantGroupProperties
         } catch (error) {
-            result.setError("⚠️ Resolve conflicting variants in order to continue")
+            result.setError(
+                "⚠️ Resolve conflicting variants in order to continue"
+            )
             return
         }
 
-        const propsList = Object.keys(variantProps)
+        const propNames = Object.keys(variantGroupProperties)
 
-        if (propsList.length < 2) {
+        if (propNames.length < 2) {
             result.setError("⚠️ The component must have more than one property")
             return
         }
 
-        const suggestions = propsList.filter(
+        const suggestions = propNames.filter(
             (item) =>
                 item.toLowerCase().includes(query.toLowerCase()) &&
                 item !== parameters["column"] &&
@@ -59,18 +61,18 @@ function startPluginWithParameters(parameters: ParameterValues) {
     const componentSet = selection[0] as ComponentSetNode
     const variants = componentSet.children
 
-    let variantProps
-        try {
-            variantProps = componentSet.variantGroupProperties
-        } catch (error) {
-            figma.notify("⚠️ Resolve conflicting variants in order to continue")
-            figma.closePlugin()
-            return
-        }
-    
+    let variantGroupProperties
+    try {
+        variantGroupProperties = componentSet.variantGroupProperties
+    } catch (error) {
+        figma.notify("⚠️ Resolve conflicting variants in order to continue")
+        figma.closePlugin()
+        return
+    }
+
     // Check parameters match component properties
     const match = Object.values(parameters).every((value) =>
-        Object.keys(variantProps).includes(value)
+        Object.keys(variantGroupProperties).includes(value)
     )
     if (!match) {
         figma.notify("⚠️ Chosen properties don't match component properties")
@@ -83,10 +85,13 @@ function startPluginWithParameters(parameters: ParameterValues) {
     const spacing_groups = 96
 
     // Determine columns and rows in both sub-grid and horizontal groups
-    const columnProps_subGrid = variantProps[parameters["column"]].values
-    const rowProps_subGrid = variantProps[parameters["row"]].values
-    const columnProps_group =
-        parameters["hGroup"] && variantProps[parameters["hGroup"]].values
+    const columnPropValues_subGrid =
+        variantGroupProperties[parameters["column"]].values
+    const rowPropValues_subGrid =
+        variantGroupProperties[parameters["row"]].values
+    const columnPropValues_group =
+        parameters["hGroup"] &&
+        variantGroupProperties[parameters["hGroup"]].values
 
     // Calculate grid sizing based on largest variant sizes (rounded up to sit on 8px grid)
     const maxWidth =
@@ -95,17 +100,18 @@ function startPluginWithParameters(parameters: ParameterValues) {
         Math.ceil(Math.max(...variants.map((element) => element.height)) / 8) *
         8
 
-    const columnCount_subGrid = columnProps_subGrid.length
-    const rowCount_subGrid = rowProps_subGrid.length
-
     const dx_subGrid = maxWidth + spacing_subGrid
     const dy_subGrid = maxHeight + spacing_subGrid
     const dx_group =
-        dx_subGrid * columnCount_subGrid - spacing_subGrid + spacing_groups
+        dx_subGrid * columnPropValues_subGrid.length -
+        spacing_subGrid +
+        spacing_groups
     const dy_group =
-        dy_subGrid * rowCount_subGrid - spacing_subGrid + spacing_groups
+        dy_subGrid * rowPropValues_subGrid.length -
+        spacing_subGrid +
+        spacing_groups
 
-    // Seperate out properties used for vetical grouping
+    // Seperate out properties used for vertical grouping
     function getGroupProps(variant: ComponentNode) {
         const props = variant.variantProperties
 
@@ -121,14 +127,20 @@ function startPluginWithParameters(parameters: ParameterValues) {
         return groupProps
     }
 
-    const groupPropsList = variants.map((variant: ComponentNode) =>
+    const groupPropsOfEveryVariant = variants.map((variant: ComponentNode) =>
         getGroupProps(variant)
     )
 
     // Calculate group numbers and sort according to order of props and values in Component Set
     function getPropIdentifier([key, value]) {
-        const keyIndex = getPaddedIndex(key, Object.keys(variantProps))
-        const valueIndex = getPaddedIndex(value, variantProps[key].values)
+        const keyIndex = getPaddedIndex(
+            key,
+            Object.keys(variantGroupProperties)
+        )
+        const valueIndex = getPaddedIndex(
+            value,
+            variantGroupProperties[key].values
+        )
         return `${keyIndex}${valueIndex}`
     }
 
@@ -142,7 +154,7 @@ function startPluginWithParameters(parameters: ParameterValues) {
 
     const uniqueGroups = [
         ...new Map(
-            groupPropsList.map((obj) => [JSON.stringify(obj), obj])
+            groupPropsOfEveryVariant.map((obj) => [JSON.stringify(obj), obj])
         ).keys(),
     ].sort((a, b) => {
         const idA = getObjectIdentifier(a)
@@ -163,14 +175,14 @@ function startPluginWithParameters(parameters: ParameterValues) {
     variants.forEach((variant: ComponentNode) => {
         const props = variant.variantProperties
 
-        const columnIndex_subGrid = columnProps_subGrid.indexOf(
+        const columnIndex_subGrid = columnPropValues_subGrid.indexOf(
             props[parameters["column"]]
         )
-        const rowIndex_subGrid = rowProps_subGrid.indexOf(
+        const rowIndex_subGrid = rowPropValues_subGrid.indexOf(
             props[parameters["row"]]
         )
         const columnIndex_group = parameters["hGroup"]
-            ? columnProps_group.indexOf(props[parameters["hGroup"]])
+            ? columnPropValues_group.indexOf(props[parameters["hGroup"]])
             : 0
         const rowIndex_group = uniqueGroups.indexOf(
             JSON.stringify(getGroupProps(variant))
@@ -204,7 +216,7 @@ function startPluginWithParameters(parameters: ParameterValues) {
     // Create frame to contain labels and match its size & position to component set
     const componentSetIndex = componentSet.parent.children.indexOf(componentSet)
     const labelsParentFrame = figma.createFrame()
-    componentSet.parent.insertChild(componentSetIndex,labelsParentFrame)
+    componentSet.parent.insertChild(componentSetIndex, labelsParentFrame)
 
     labelsParentFrame.x = componentSet.x
     labelsParentFrame.y = componentSet.y
@@ -218,29 +230,51 @@ function startPluginWithParameters(parameters: ParameterValues) {
     const labels_rowGroups = []
     const labels_subGridRows = []
 
+    // Get list of boolean properties
+    const booleanPropNames = Object.entries(variantGroupProperties)
+        .filter((arr) => {
+            const values = arr[1]["values"]
+                .map((value) => value.toLowerCase())
+                .sort()
+            if (values.length !== 2) return false
+            return (
+                (values[0] === "off" && values[1] === "on") ||
+                (values[0] === "false" && values[1] === "true")
+            )
+        })
+        .map((arr) => arr[0])
+
+    // Include property names with boolean values to make labels clearer
+    function getLabelText(key, value) {
+        return booleanPropNames.includes(key) ? `${key}=${value}` : value
+    }
+
     function createSubGridColumnLabels(groupIndex) {
-        columnProps_subGrid.forEach((prop, i) => {
-            const label = createText(prop)
+        columnPropValues_subGrid.forEach((value, i) => {
+            const label = createText(getLabelText(parameters["column"], value))
             labelsParentFrame.appendChild(label)
             label.x = dx_subGrid * i + dx_group * groupIndex + spacing_subGrid
-            label.y = - spacing_subGrid * 2
+            label.y = -spacing_subGrid * 2
         })
     }
 
     function createSubGridRowLabels(groupIndex) {
-        rowProps_subGrid.forEach((prop, i) => {
-            const label = createText(prop)
+        rowPropValues_subGrid.forEach((value, i) => {
+            const label = createText(getLabelText(parameters["row"], value))
             labelsParentFrame.appendChild(label)
             labels_subGridRows.push(label)
-            label.y =
-                dy_subGrid * i + dy_group * groupIndex + spacing_subGrid
+            label.y = dy_subGrid * i + dy_group * groupIndex + spacing_subGrid
         })
     }
 
     // Generate column labels
-    if (columnProps_group) {
-        columnProps_group.forEach((prop, i) => {
-            const label = createText(prop, 20, "Bold")
+    if (columnPropValues_group) {
+        columnPropValues_group.forEach((value, i) => {
+            const label = createText(
+                getLabelText(parameters["hGroup"], value),
+                20,
+                "Bold"
+            )
             labelsParentFrame.appendChild(label)
             label.x = dx_group * i + spacing_subGrid
             label.y = -spacing_groups - spacing_subGrid * 2
@@ -253,9 +287,10 @@ function startPluginWithParameters(parameters: ParameterValues) {
     // Generate row labels
     if (uniqueGroups.length > 1) {
         uniqueGroups.forEach((json, i) => {
-            const obj = JSON.parse(json)
-            const characters = Object.values(obj).toString()
-            const label = createText(characters, 20, "Bold")
+            const labelText = Object.entries(JSON.parse(json))
+                .map(([key, value]) => getLabelText(key, value))
+                .join(", ")
+            const label = createText(labelText, 20, "Bold")
             labelsParentFrame.appendChild(label)
             label.y = dy_group * i + spacing_subGrid
             labels_rowGroups.push(label)

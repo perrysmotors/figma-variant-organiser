@@ -10,7 +10,7 @@ Variant Organiser is keyboard operated:
 
 **→** Select a main component with variants.
 
-**→** Type `⌘` + `/` to open Figma’s quick actions search bar (or `CRTL` + `/` if you are on Windows).
+**→** Type `⌘` + `/` to open Figma’s quick actions search bar (or `CTRL` + `/` if you are on Windows).
 
 **→** Start typing “Variant Organiser” to search for and run the plugin.
 
