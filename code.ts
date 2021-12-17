@@ -17,7 +17,9 @@ figma.parameters.on(
         try {
             variantProps = componentSet.variantGroupProperties
         } catch (error) {
-            result.setError("⚠️ Resolve conflicting variants in order to continue")
+            result.setError(
+                "⚠️ Resolve conflicting variants in order to continue"
+            )
             return
         }
 
@@ -60,14 +62,14 @@ function startPluginWithParameters(parameters: ParameterValues) {
     const variants = componentSet.children
 
     let variantProps
-        try {
-            variantProps = componentSet.variantGroupProperties
-        } catch (error) {
-            figma.notify("⚠️ Resolve conflicting variants in order to continue")
-            figma.closePlugin()
-            return
-        }
-    
+    try {
+        variantProps = componentSet.variantGroupProperties
+    } catch (error) {
+        figma.notify("⚠️ Resolve conflicting variants in order to continue")
+        figma.closePlugin()
+        return
+    }
+
     // Check parameters match component properties
     const match = Object.values(parameters).every((value) =>
         Object.keys(variantProps).includes(value)
@@ -105,7 +107,7 @@ function startPluginWithParameters(parameters: ParameterValues) {
     const dy_group =
         dy_subGrid * rowCount_subGrid - spacing_subGrid + spacing_groups
 
-    // Seperate out properties used for vetical grouping
+    // Seperate out properties used for vertical grouping
     function getGroupProps(variant: ComponentNode) {
         const props = variant.variantProperties
 
@@ -204,7 +206,7 @@ function startPluginWithParameters(parameters: ParameterValues) {
     // Create frame to contain labels and match its size & position to component set
     const componentSetIndex = componentSet.parent.children.indexOf(componentSet)
     const labelsParentFrame = figma.createFrame()
-    componentSet.parent.insertChild(componentSetIndex,labelsParentFrame)
+    componentSet.parent.insertChild(componentSetIndex, labelsParentFrame)
 
     labelsParentFrame.x = componentSet.x
     labelsParentFrame.y = componentSet.y
@@ -223,7 +225,7 @@ function startPluginWithParameters(parameters: ParameterValues) {
             const label = createText(prop)
             labelsParentFrame.appendChild(label)
             label.x = dx_subGrid * i + dx_group * groupIndex + spacing_subGrid
-            label.y = - spacing_subGrid * 2
+            label.y = -spacing_subGrid * 2
         })
     }
 
@@ -232,8 +234,7 @@ function startPluginWithParameters(parameters: ParameterValues) {
             const label = createText(prop)
             labelsParentFrame.appendChild(label)
             labels_subGridRows.push(label)
-            label.y =
-                dy_subGrid * i + dy_group * groupIndex + spacing_subGrid
+            label.y = dy_subGrid * i + dy_group * groupIndex + spacing_subGrid
         })
     }
 
