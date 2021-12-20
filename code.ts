@@ -44,16 +44,14 @@ figma.parameters.on(
 // When the user presses Enter after inputting all parameters, the 'run' event is fired.
 figma.on("run", async ({ parameters }: RunEvent) => {
     await loadFonts()
-    if (parameters) {
-        await startPluginWithParameters(parameters)
-    }
+    await startPluginWithParameters(parameters)
+    figma.closePlugin()
 })
 
 function startPluginWithParameters(parameters: ParameterValues) {
     const selection = getFilteredSelection()
     if (selection.length !== 1) {
         figma.notify("⚠️ Select a single component set first")
-        figma.closePlugin()
         return
     }
 
@@ -66,7 +64,6 @@ function startPluginWithParameters(parameters: ParameterValues) {
         variantGroupProperties = componentSet.variantGroupProperties
     } catch (error) {
         figma.notify("⚠️ Resolve conflicting variants in order to continue")
-        figma.closePlugin()
         return
     }
 
@@ -76,7 +73,6 @@ function startPluginWithParameters(parameters: ParameterValues) {
     )
     if (!match) {
         figma.notify("⚠️ Chosen properties don't match component properties")
-        figma.closePlugin()
         return
     }
 
@@ -320,10 +316,6 @@ function startPluginWithParameters(parameters: ParameterValues) {
     labels_subGridRows.forEach((label) => {
         label.x = label.x - labelMaxWidth_subGridRows - spacing_subGrid
     })
-
-    // Make sure to close the plugin when you're done. Otherwise the plugin will
-    // keep running, which shows the cancel button at the bottom of the screen.
-    figma.closePlugin()
 }
 
 function getFilteredSelection() {
