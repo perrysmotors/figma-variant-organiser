@@ -44,11 +44,12 @@ figma.parameters.on(
 // When the user presses Enter after inputting all parameters, the 'run' event is fired.
 figma.on("run", async ({ parameters }: RunEvent) => {
     await loadFonts()
-    startPluginWithParameters(parameters)
+    const spacing = await getSpacing()
+    startPluginWithParameters(parameters, spacing)
     figma.closePlugin()
 })
 
-function startPluginWithParameters(parameters: ParameterValues) {
+function startPluginWithParameters(parameters: ParameterValues, spacing) {
     const selection = getFilteredSelection()
     if (selection.length !== 1) {
         figma.notify("⚠️ Select a single component set first")
@@ -76,10 +77,6 @@ function startPluginWithParameters(parameters: ParameterValues) {
         return
     }
 
-    // Set defaults for grid spacing
-    const spacing_subGrid = 24
-    const spacing_groups = 96
-
     // Determine columns and rows in both sub-grid and horizontal groups
     const columnPropValues_subGrid =
         variantGroupProperties[parameters["column"]].values
@@ -96,16 +93,16 @@ function startPluginWithParameters(parameters: ParameterValues) {
         Math.ceil(Math.max(...variants.map((element) => element.height)) / 8) *
         8
 
-    const dx_subGrid = maxWidth + spacing_subGrid
-    const dy_subGrid = maxHeight + spacing_subGrid
+    const dx_subGrid = maxWidth + spacing.subGrid
+    const dy_subGrid = maxHeight + spacing.subGrid
     const dx_group =
         dx_subGrid * columnPropValues_subGrid.length -
-        spacing_subGrid +
-        spacing_groups
+        spacing.subGrid +
+        spacing.groups
     const dy_group =
         dy_subGrid * rowPropValues_subGrid.length -
-        spacing_subGrid +
-        spacing_groups
+        spacing.subGrid +
+        spacing.groups
 
     // Seperate out properties used for vertical grouping
     function getGroupProps(variant: ComponentNode) {
@@ -187,11 +184,11 @@ function startPluginWithParameters(parameters: ParameterValues) {
         variant.x =
             columnIndex_subGrid * dx_subGrid +
             columnIndex_group * dx_group +
-            spacing_subGrid
+            spacing.subGrid
         variant.y =
             rowIndex_subGrid * dy_subGrid +
             rowIndex_group * dy_group +
-            spacing_subGrid
+            spacing.subGrid
     })
 
     // Resize Component Set
@@ -205,8 +202,8 @@ function startPluginWithParameters(parameters: ParameterValues) {
     )
 
     componentSet.resizeWithoutConstraints(
-        bottomRigthX + spacing_subGrid,
-        bottomRigthY + spacing_subGrid
+        bottomRigthX + spacing.subGrid,
+        bottomRigthY + spacing.subGrid
     )
 
     // Create frame to contain labels and match its size & position to component set
@@ -249,8 +246,8 @@ function startPluginWithParameters(parameters: ParameterValues) {
         columnPropValues_subGrid.forEach((value, i) => {
             const label = createText(getLabelText(parameters["column"], value))
             labelsParentFrame.appendChild(label)
-            label.x = dx_subGrid * i + dx_group * groupIndex + spacing_subGrid
-            label.y = -spacing_subGrid * 2
+            label.x = dx_subGrid * i + dx_group * groupIndex + spacing.subGrid
+            label.y = -spacing.subGrid * 2
         })
     }
 
@@ -259,7 +256,7 @@ function startPluginWithParameters(parameters: ParameterValues) {
             const label = createText(getLabelText(parameters["row"], value))
             labelsParentFrame.appendChild(label)
             labels_subGridRows.push(label)
-            label.y = dy_subGrid * i + dy_group * groupIndex + spacing_subGrid
+            label.y = dy_subGrid * i + dy_group * groupIndex + spacing.subGrid
         })
     }
 
@@ -272,8 +269,8 @@ function startPluginWithParameters(parameters: ParameterValues) {
                 "Bold"
             )
             labelsParentFrame.appendChild(label)
-            label.x = dx_group * i + spacing_subGrid
-            label.y = -spacing_groups - spacing_subGrid * 2
+            label.x = dx_group * i + spacing.subGrid
+            label.y = -spacing.groups - spacing.subGrid * 2
             createSubGridColumnLabels(i)
         })
     } else {
@@ -288,7 +285,7 @@ function startPluginWithParameters(parameters: ParameterValues) {
                 .join(", ")
             const label = createText(labelText, 20, "Bold")
             labelsParentFrame.appendChild(label)
-            label.y = dy_group * i + spacing_subGrid
+            label.y = dy_group * i + spacing.subGrid
             labels_rowGroups.push(label)
             createSubGridRowLabels(i)
         })
@@ -310,11 +307,11 @@ function startPluginWithParameters(parameters: ParameterValues) {
             label.x -
             labelMaxWidth_rowGroups -
             labelMaxWidth_subGridRows -
-            spacing_subGrid -
-            spacing_groups
+            spacing.subGrid -
+            spacing.groups
     })
     labels_subGridRows.forEach((label) => {
-        label.x = label.x - labelMaxWidth_subGridRows - spacing_subGrid
+        label.x = label.x - labelMaxWidth_subGridRows - spacing.subGrid
     })
 }
 
@@ -356,4 +353,10 @@ function createText(
         },
     ]
     return text
+}
+
+async function getSpacing() {
+    const spacing = await figma.clientStorage.getAsync("spacing")
+    if (spacing === undefined) return { subGrid: 24, groups: 96 }
+    return spacing
 }
