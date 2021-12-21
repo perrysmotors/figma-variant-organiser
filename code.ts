@@ -44,7 +44,7 @@ figma.parameters.on(
 // When the user presses Enter after inputting all parameters, the 'run' event is fired.
 figma.on("run", async ({ parameters }: RunEvent) => {
     await loadFonts()
-    await startPluginWithParameters(parameters)
+    startPluginWithParameters(parameters)
     figma.closePlugin()
 })
 
