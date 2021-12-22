@@ -77,27 +77,30 @@ figma.parameters.on(
 
 // When the user presses Enter after inputting all parameters, the 'run' event is fired.
 figma.on("run", async ({ command, parameters }: RunEvent) => {
+    let closeMessage = ""
     if (command === "organise") {
         await loadFonts()
         const spacing = await getSpacing()
-        startPluginWithParameters(parameters, spacing)
+        const errorMessage = organise(parameters, spacing)
+        if (errorMessage) {
+            figma.notify(errorMessage, { error: true })
+        } else {
+            closeMessage = "Done"
+        }
     } else {
         await figma.clientStorage.setAsync("spacing", {
             subGrid: parameters["spacing_subGrid"],
             groups: parameters["spacing_groups"],
         })
-        figma.notify("Settings updated")
-    }       
-    figma.closePlugin()
+        closeMessage = "Settings updated"
+    }
+    figma.closePlugin(closeMessage)
 })
 
-function startPluginWithParameters(parameters: ParameterValues, spacing) {
+function organise(parameters: ParameterValues, spacing): string {
     const selection = getFilteredSelection()
-    if (selection.length !== 1) {
-        figma.notify("⚠️ Select a single component set first")
-        return
-    }
-
+    if (selection.length !== 1) return "⚠️ Select a single component set first"
+    
     // Get variants and variant properties from selected Component Set
     const componentSet = selection[0] as ComponentSetNode
     const variants = componentSet.children
@@ -106,8 +109,7 @@ function startPluginWithParameters(parameters: ParameterValues, spacing) {
     try {
         variantGroupProperties = componentSet.variantGroupProperties
     } catch (error) {
-        figma.notify("⚠️ Resolve conflicting variants in order to continue")
-        return
+        return "⚠️ Resolve conflicting variants in order to continue"
     }
 
     // Check parameters match component properties
@@ -115,8 +117,7 @@ function startPluginWithParameters(parameters: ParameterValues, spacing) {
         Object.keys(variantGroupProperties).includes(value)
     )
     if (!match) {
-        figma.notify("⚠️ Chosen properties don't match component properties")
-        return
+        return "⚠️ Chosen properties don't match component properties"
     }
 
     // Determine columns and rows in both sub-grid and horizontal groups
