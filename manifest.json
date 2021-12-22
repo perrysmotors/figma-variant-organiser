@@ -39,14 +39,14 @@
       "parameterOnly": true,
       "parameters": [
         {
-          "name": "Primary grid spacing",
+          "name": "Variant spacing",
           "key": "spacing_subGrid",
-          "description": "Set spacing for primary grid"
+          "description": "Set spacing between variants"
         },
         {
           "name": "Group spacing",
           "key": "spacing_groups",
-          "description": "Set spacing of groups"
+          "description": "Set spacing between groups"
         }
       ]
     }
