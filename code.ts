@@ -100,7 +100,7 @@ figma.on("run", async ({ command, parameters }: RunEvent) => {
 function organise(parameters: ParameterValues, spacing): string {
     const selection = getFilteredSelection()
     if (selection.length !== 1) return "⚠️ Select a single component set first"
-    
+
     // Get variants and variant properties from selected Component Set
     const componentSet = selection[0] as ComponentSetNode
     const variants = componentSet.children
@@ -290,7 +290,7 @@ function organise(parameters: ParameterValues, spacing): string {
             const label = createText(getLabelText(parameters["column"], value))
             labelsParentFrame.appendChild(label)
             label.x = dx_subGrid * i + dx_group * groupIndex + spacing.subGrid
-            label.y = -spacing.subGrid * 2
+            label.y = -spacing.subGrid - label.height
         })
     }
 
@@ -313,7 +313,7 @@ function organise(parameters: ParameterValues, spacing): string {
             )
             labelsParentFrame.appendChild(label)
             label.x = dx_group * i + spacing.subGrid
-            label.y = -spacing.groups - spacing.subGrid * 2
+            label.y = -spacing.groups - spacing.subGrid - label.height - 24 // allow 24 for height of sub-grid labels
             createSubGridColumnLabels(i)
         })
     } else {
