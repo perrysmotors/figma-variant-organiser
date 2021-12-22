@@ -34,19 +34,19 @@
       ]
     },
     {
-      "name": "Settings",
-      "command": "settings",
+      "name": "Preferences",
+      "command": "preferences",
       "parameterOnly": true,
       "parameters": [
         {
           "name": "Variant spacing",
           "key": "spacing_subGrid",
-          "description": "Set spacing between variants"
+          "description": "Set the spacing between variants in pixels"
         },
         {
-          "name": "Group spacing",
+          "name": "Block spacing",
           "key": "spacing_groups",
-          "description": "Set spacing between groups"
+          "description": "Set the spacing between blocks in pixels"
         }
       ]
     }

@@ -92,7 +92,7 @@ figma.on("run", async ({ command, parameters }: RunEvent) => {
             subGrid: parameters["spacing_subGrid"],
             groups: parameters["spacing_groups"],
         })
-        closeMessage = "Settings updated"
+        closeMessage = "Preferences updated"
     }
     figma.closePlugin(closeMessage)
 })
