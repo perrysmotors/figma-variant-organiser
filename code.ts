@@ -3,49 +3,91 @@
 // The 'input' event listens for text change in the Quick Actions box after a plugin is 'Tabbed' into.
 figma.parameters.on(
     "input",
-    ({ query, parameters, result }: ParameterInputEvent) => {
-        const selection = getFilteredSelection()
+    ({ key, query, parameters, result }: ParameterInputEvent) => {
+        let suggestions
+        switch (key) {
+            case "row":
+            case "column":
+            case "hGroup":
+                const selection = getFilteredSelection()
 
-        if (selection.length !== 1) {
-            result.setError("⚠️ Select a single component set first")
-            return
+                if (selection.length !== 1) {
+                    result.setError("⚠️ Select a single component set first")
+                    return
+                }
+
+                const componentSet = selection[0] as ComponentSetNode
+
+                let variantGroupProperties
+                try {
+                    variantGroupProperties = componentSet.variantGroupProperties
+                } catch (error) {
+                    result.setError(
+                        "⚠️ Resolve conflicting variants in order to continue"
+                    )
+                    return
+                }
+
+                const propNames = Object.keys(variantGroupProperties)
+
+                if (propNames.length < 2) {
+                    result.setError(
+                        "⚠️ The component must have more than one property"
+                    )
+                    return
+                }
+
+                suggestions = propNames.filter(
+                    (item) =>
+                        item.toLowerCase().includes(query.toLowerCase()) &&
+                        item !== parameters["column"] &&
+                        item !== parameters["row"]
+                )
+                break
+
+            case "spacing_subGrid":
+            case "spacing_groups":
+                const defaults =
+                    key === "spacing_subGrid"
+                        ? ["8", "16", "24", "32", "40"]
+                        : ["96", "192", "288", "384", "480"]
+
+                // Check the input is valid
+                const number = Number(query)
+                if (!Number.isInteger(number) || number < 0) {
+                    result.setError("⚠️ Try entering a positive number")
+                    return
+                }
+
+                suggestions = (
+                    query === "" || defaults.includes(query)
+                        ? defaults
+                        : [query, ...defaults]
+                ) // default values plus the typed value
+                    .filter((s) => s.includes(query)) // just values matching the typed value
+                    .map((value) => ({ name: value, data: Number(value) })) // include the numerical value with the suggestions
+                break
+
+            default:
+                return
         }
-
-        const componentSet = selection[0] as ComponentSetNode
-
-        let variantGroupProperties
-        try {
-            variantGroupProperties = componentSet.variantGroupProperties
-        } catch (error) {
-            result.setError(
-                "⚠️ Resolve conflicting variants in order to continue"
-            )
-            return
-        }
-
-        const propNames = Object.keys(variantGroupProperties)
-
-        if (propNames.length < 2) {
-            result.setError("⚠️ The component must have more than one property")
-            return
-        }
-
-        const suggestions = propNames.filter(
-            (item) =>
-                item.toLowerCase().includes(query.toLowerCase()) &&
-                item !== parameters["column"] &&
-                item !== parameters["row"]
-        )
-
         result.setSuggestions(suggestions)
     }
 )
 
 // When the user presses Enter after inputting all parameters, the 'run' event is fired.
-figma.on("run", async ({ parameters }: RunEvent) => {
-    await loadFonts()
-    const spacing = await getSpacing()
-    startPluginWithParameters(parameters, spacing)
+figma.on("run", async ({ command, parameters }: RunEvent) => {
+    if (command === "organise") {
+        await loadFonts()
+        const spacing = await getSpacing()
+        startPluginWithParameters(parameters, spacing)
+    } else {
+        await figma.clientStorage.setAsync("spacing", {
+            subGrid: parameters["spacing_subGrid"],
+            groups: parameters["spacing_groups"],
+        })
+        figma.notify("Settings updated")
+    }       
     figma.closePlugin()
 })
 
