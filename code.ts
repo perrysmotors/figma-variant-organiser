@@ -3,59 +3,103 @@
 // The 'input' event listens for text change in the Quick Actions box after a plugin is 'Tabbed' into.
 figma.parameters.on(
     "input",
-    ({ query, parameters, result }: ParameterInputEvent) => {
-        const selection = getFilteredSelection()
+    ({ key, query, parameters, result }: ParameterInputEvent) => {
+        let suggestions
+        switch (key) {
+            case "row":
+            case "column":
+            case "hGroup":
+                const selection = getFilteredSelection()
 
-        if (selection.length !== 1) {
-            result.setError("⚠️ Select a single component set first")
-            return
+                if (selection.length !== 1) {
+                    result.setError("⚠️ Select a single component set first")
+                    return
+                }
+
+                const componentSet = selection[0] as ComponentSetNode
+
+                let variantGroupProperties
+                try {
+                    variantGroupProperties = componentSet.variantGroupProperties
+                } catch (error) {
+                    result.setError(
+                        "⚠️ Resolve conflicting variants in order to continue"
+                    )
+                    return
+                }
+
+                const propNames = Object.keys(variantGroupProperties)
+
+                if (propNames.length < 2) {
+                    result.setError(
+                        "⚠️ The component must have more than one property"
+                    )
+                    return
+                }
+
+                suggestions = propNames.filter(
+                    (item) =>
+                        item.toLowerCase().includes(query.toLowerCase()) &&
+                        item !== parameters["column"] &&
+                        item !== parameters["row"]
+                )
+                break
+
+            case "spacing_subGrid":
+            case "spacing_groups":
+                const defaults =
+                    key === "spacing_subGrid"
+                        ? ["8", "16", "24", "32", "40"]
+                        : ["96", "192", "288", "384", "480"]
+
+                // Check the input is valid
+                const number = Number(query)
+                if (!Number.isInteger(number) || number < 0) {
+                    result.setError("⚠️ Try entering a positive number")
+                    return
+                }
+
+                suggestions = (
+                    query === "" || defaults.includes(query)
+                        ? defaults
+                        : [query, ...defaults]
+                ) // default values plus the typed value
+                    .filter((s) => s.includes(query)) // just values matching the typed value
+                    .map((value) => ({ name: value, data: Number(value) })) // include the numerical value with the suggestions
+                break
+
+            default:
+                return
         }
-
-        const componentSet = selection[0] as ComponentSetNode
-
-        let variantGroupProperties
-        try {
-            variantGroupProperties = componentSet.variantGroupProperties
-        } catch (error) {
-            result.setError(
-                "⚠️ Resolve conflicting variants in order to continue"
-            )
-            return
-        }
-
-        const propNames = Object.keys(variantGroupProperties)
-
-        if (propNames.length < 2) {
-            result.setError("⚠️ The component must have more than one property")
-            return
-        }
-
-        const suggestions = propNames.filter(
-            (item) =>
-                item.toLowerCase().includes(query.toLowerCase()) &&
-                item !== parameters["column"] &&
-                item !== parameters["row"]
-        )
-
         result.setSuggestions(suggestions)
     }
 )
 
 // When the user presses Enter after inputting all parameters, the 'run' event is fired.
-figma.on("run", async ({ parameters }: RunEvent) => {
-    await loadFonts()
-    if (parameters) {
-        await startPluginWithParameters(parameters)
+figma.on("run", async ({ command, parameters }: RunEvent) => {
+    let closeMessage = ""
+    if (command === "organise") {
+        await loadFonts()
+        const spacing = await getSpacing()
+        const errorMessage = organise(parameters, spacing)
+        if (errorMessage) {
+            figma.notify(errorMessage, { error: true })
+        } else {
+            closeMessage = "Done"
+        }
+    } else {
+        await figma.clientStorage.setAsync("spacing", {
+            subGrid: parameters["spacing_subGrid"],
+            groups: parameters["spacing_groups"],
+        })
+        closeMessage = "Preferences updated"
     }
+    figma.closePlugin(closeMessage)
 })
 
-function startPluginWithParameters(parameters: ParameterValues) {
+function organise(parameters: ParameterValues, spacing): string {
     const selection = getFilteredSelection()
-    if (selection.length !== 1) {
-        figma.notify("⚠️ Select a single component set first")
-        figma.closePlugin()
-        return
-    }
+    if (selection.length !== 1) return "⚠️ Select a single component set first"
 
     // Get variants and variant properties from selected Component Set
     const componentSet = selection[0] as ComponentSetNode
@@ -65,9 +109,7 @@ function startPluginWithParameters(parameters: ParameterValues) {
     try {
         variantGroupProperties = componentSet.variantGroupProperties
     } catch (error) {
-        figma.notify("⚠️ Resolve conflicting variants in order to continue")
-        figma.closePlugin()
-        return
+        return "⚠️ Resolve conflicting variants in order to continue"
     }
 
     // Check parameters match component properties
@@ -75,14 +117,8 @@ function startPluginWithParameters(parameters: ParameterValues) {
         Object.keys(variantGroupProperties).includes(value)
     )
     if (!match) {
-        figma.notify("⚠️ Chosen properties don't match component properties")
-        figma.closePlugin()
-        return
+        return "⚠️ Chosen properties don't match component properties"
     }
-
-    // Set defaults for grid spacing
-    const spacing_subGrid = 24
-    const spacing_groups = 96
 
     // Determine columns and rows in both sub-grid and horizontal groups
     const columnPropValues_subGrid =
@@ -100,16 +136,16 @@ function startPluginWithParameters(parameters: ParameterValues) {
         Math.ceil(Math.max(...variants.map((element) => element.height)) / 8) *
         8
 
-    const dx_subGrid = maxWidth + spacing_subGrid
-    const dy_subGrid = maxHeight + spacing_subGrid
+    const dx_subGrid = maxWidth + spacing.subGrid
+    const dy_subGrid = maxHeight + spacing.subGrid
     const dx_group =
         dx_subGrid * columnPropValues_subGrid.length -
-        spacing_subGrid +
-        spacing_groups
+        spacing.subGrid +
+        spacing.groups
     const dy_group =
         dy_subGrid * rowPropValues_subGrid.length -
-        spacing_subGrid +
-        spacing_groups
+        spacing.subGrid +
+        spacing.groups
 
     // Seperate out properties used for vertical grouping
     function getGroupProps(variant: ComponentNode) {
@@ -191,11 +227,11 @@ function startPluginWithParameters(parameters: ParameterValues) {
         variant.x =
             columnIndex_subGrid * dx_subGrid +
             columnIndex_group * dx_group +
-            spacing_subGrid
+            spacing.subGrid
         variant.y =
             rowIndex_subGrid * dy_subGrid +
             rowIndex_group * dy_group +
-            spacing_subGrid
+            spacing.subGrid
     })
 
     // Resize Component Set
@@ -209,8 +245,8 @@ function startPluginWithParameters(parameters: ParameterValues) {
     )
 
     componentSet.resizeWithoutConstraints(
-        bottomRigthX + spacing_subGrid,
-        bottomRigthY + spacing_subGrid
+        bottomRigthX + spacing.subGrid,
+        bottomRigthY + spacing.subGrid
     )
 
     // Create frame to contain labels and match its size & position to component set
@@ -253,8 +289,8 @@ function startPluginWithParameters(parameters: ParameterValues) {
         columnPropValues_subGrid.forEach((value, i) => {
             const label = createText(getLabelText(parameters["column"], value))
             labelsParentFrame.appendChild(label)
-            label.x = dx_subGrid * i + dx_group * groupIndex + spacing_subGrid
-            label.y = -spacing_subGrid * 2
+            label.x = dx_subGrid * i + dx_group * groupIndex + spacing.subGrid
+            label.y = -spacing.subGrid - label.height
         })
     }
 
@@ -263,7 +299,7 @@ function startPluginWithParameters(parameters: ParameterValues) {
             const label = createText(getLabelText(parameters["row"], value))
             labelsParentFrame.appendChild(label)
             labels_subGridRows.push(label)
-            label.y = dy_subGrid * i + dy_group * groupIndex + spacing_subGrid
+            label.y = dy_subGrid * i + dy_group * groupIndex + spacing.subGrid
         })
     }
 
@@ -276,8 +312,8 @@ function startPluginWithParameters(parameters: ParameterValues) {
                 "Bold"
             )
             labelsParentFrame.appendChild(label)
-            label.x = dx_group * i + spacing_subGrid
-            label.y = -spacing_groups - spacing_subGrid * 2
+            label.x = dx_group * i + spacing.subGrid
+            label.y = -spacing.groups - spacing.subGrid - label.height - 24 // allow 24 for height of sub-grid labels
             createSubGridColumnLabels(i)
         })
     } else {
@@ -292,7 +328,7 @@ function startPluginWithParameters(parameters: ParameterValues) {
                 .join(", ")
             const label = createText(labelText, 20, "Bold")
             labelsParentFrame.appendChild(label)
-            label.y = dy_group * i + spacing_subGrid
+            label.y = dy_group * i + spacing.subGrid
             labels_rowGroups.push(label)
             createSubGridRowLabels(i)
         })
@@ -314,16 +350,12 @@ function startPluginWithParameters(parameters: ParameterValues) {
             label.x -
             labelMaxWidth_rowGroups -
             labelMaxWidth_subGridRows -
-            spacing_subGrid -
-            spacing_groups
+            spacing.subGrid -
+            spacing.groups
     })
     labels_subGridRows.forEach((label) => {
-        label.x = label.x - labelMaxWidth_subGridRows - spacing_subGrid
+        label.x = label.x - labelMaxWidth_subGridRows - spacing.subGrid
     })
-
-    // Make sure to close the plugin when you're done. Otherwise the plugin will
-    // keep running, which shows the cancel button at the bottom of the screen.
-    figma.closePlugin()
 }
 
 function getFilteredSelection() {
@@ -364,4 +396,10 @@ function createText(
         },
     ]
     return text
+}
+
+async function getSpacing() {
+    const spacing = await figma.clientStorage.getAsync("spacing")
+    if (spacing === undefined) return { subGrid: 24, groups: 96 }
+    return spacing
 }
