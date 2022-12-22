@@ -208,6 +208,8 @@ function organise(parameters: ParameterValues, spacing): string {
     })
 
     // Layout variants in grid
+    componentSet.layoutMode = "NONE"
+
     variants.forEach((variant: ComponentNode) => {
         const props = variant.variantProperties
 
@@ -235,8 +237,6 @@ function organise(parameters: ParameterValues, spacing): string {
     })
 
     // Resize Component Set
-    componentSet.layoutMode = "NONE"
-
     const bottomRigthX = Math.max(
         ...variants.map((child) => child.x + child.width)
     )
