@@ -275,6 +275,7 @@ function organise(parameters: ParameterValues, spacing): string {
             if (values.length !== 2) return false
             return (
                 (values[0] === "off" && values[1] === "on") ||
+                (values[0] === "no" && values[1] === "yes") ||
                 (values[0] === "false" && values[1] === "true")
             )
         })
