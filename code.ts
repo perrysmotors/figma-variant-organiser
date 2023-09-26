@@ -83,7 +83,7 @@ figma.on("run", async ({ command, parameters }: RunEvent) => {
         const spacing = await getSpacing()
         const errorMessage = organise(parameters, spacing)
         if (errorMessage) {
-            figma.notify(errorMessage, { error: true })
+            figma.notify(errorMessage)
         } else {
             closeMessage = "Done"
         }
