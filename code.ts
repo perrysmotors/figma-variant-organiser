@@ -127,7 +127,7 @@ function organise(parameters: ParameterValues, spacing): string {
     const {
         row = variantKeys[0],
         column = variantKeys[1],
-        hGroup = variantKeys[2],
+        hGroup = !parameters && variantKeys[2],
     } = parameters || {}
 
     // Determine columns and rows in both sub-grid and horizontal groups
