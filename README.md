@@ -4,7 +4,7 @@
 
 Variant Organiser automatically arranges variants in a grid and creates property labels.
 
-**NEW IN THIS VERSION – Automatic Mode**
+**NEW IN VERSION 7 – Automatic Mode**
 
 ## How to use Variant Organiser
 
