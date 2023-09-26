@@ -3,12 +3,14 @@
   "id": "1047796251364453654",
   "api": "1.0.0",
   "main": "code.js",
-  "editorType": [
-    "figma"
-  ],
+  "editorType": ["figma"],
   "menu": [
     {
-      "name": "Organise",
+      "name": "Automatic",
+      "command": "organise"
+    },
+    {
+      "name": "Manual",
       "command": "organise",
       "parameterOnly": true,
       "parameters": [
@@ -33,6 +35,7 @@
         }
       ]
     },
+    { "separator": true },
     {
       "name": "Preferences",
       "command": "preferences",
