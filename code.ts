@@ -77,7 +77,7 @@ figma.parameters.on(
 
 // When the user presses Enter after inputting all parameters, the 'run' event is fired.
 figma.on("run", async ({ command, parameters }: RunEvent) => {
-    let closeMessage = ""
+    let closeMessage
     if (command === "organise") {
         await loadFonts()
         const spacing = await getSpacing()
@@ -112,22 +112,30 @@ function organise(parameters: ParameterValues, spacing): string {
         return "⚠️ Resolve conflicting variants in order to continue"
     }
 
+    const variantKeys = Object.keys(variantGroupProperties)
+
     // Check parameters match component properties
-    const match = Object.values(parameters).every((value) =>
-        Object.keys(variantGroupProperties).includes(value)
-    )
-    if (!match) {
-        return "⚠️ Chosen properties don't match component properties"
+    if (parameters) {
+        const match = Object.values(parameters).every((value) =>
+            variantKeys.includes(value)
+        )
+        if (!match) {
+            return "⚠️ Chosen properties don't match component properties"
+        }
     }
 
+    const {
+        row = variantKeys[0],
+        column = variantKeys[1],
+        hGroup = variantKeys[2],
+    } = parameters || {}
+
     // Determine columns and rows in both sub-grid and horizontal groups
+    const rowPropValues_subGrid = variantGroupProperties[row].values
     const columnPropValues_subGrid =
-        variantGroupProperties[parameters["column"]].values
-    const rowPropValues_subGrid =
-        variantGroupProperties[parameters["row"]].values
+        column && variantGroupProperties[column].values
     const columnPropValues_group =
-        parameters["hGroup"] &&
-        variantGroupProperties[parameters["hGroup"]].values
+        hGroup && variantGroupProperties[hGroup].values
 
     // Calculate grid sizing based on largest variant sizes (rounded up to sit on 8px grid)
     const maxWidth =
@@ -139,11 +147,11 @@ function organise(parameters: ParameterValues, spacing): string {
     const dx_subGrid = maxWidth + spacing.subGrid
     const dy_subGrid = maxHeight + spacing.subGrid
     const dx_group =
-        dx_subGrid * columnPropValues_subGrid.length -
+        dx_subGrid * (columnPropValues_subGrid?.length ?? 1) -
         spacing.subGrid +
         spacing.groups
     const dy_group =
-        dy_subGrid * rowPropValues_subGrid.length -
+        dy_subGrid * (rowPropValues_subGrid?.length ?? 1) -
         spacing.subGrid +
         spacing.groups
 
@@ -151,14 +159,10 @@ function organise(parameters: ParameterValues, spacing): string {
     function getGroupProps(variant: ComponentNode) {
         const props = variant.variantProperties
 
-        const {
-            [parameters["column"]]: columnProp,
-            [parameters["row"]]: rowProp,
-            ...groupProps
-        } = props
+        const { [column]: columnProp, [row]: rowProp, ...groupProps } = props
 
-        if (parameters["hGroup"]) {
-            delete groupProps[parameters["hGroup"]]
+        if (hGroup) {
+            delete groupProps[hGroup]
         }
         return groupProps
     }
@@ -213,14 +217,12 @@ function organise(parameters: ParameterValues, spacing): string {
     variants.forEach((variant: ComponentNode) => {
         const props = variant.variantProperties
 
-        const columnIndex_subGrid = columnPropValues_subGrid.indexOf(
-            props[parameters["column"]]
-        )
-        const rowIndex_subGrid = rowPropValues_subGrid.indexOf(
-            props[parameters["row"]]
-        )
-        const columnIndex_group = parameters["hGroup"]
-            ? columnPropValues_group.indexOf(props[parameters["hGroup"]])
+        const rowIndex_subGrid = rowPropValues_subGrid.indexOf(props[row])
+        const columnIndex_subGrid = column
+            ? columnPropValues_subGrid.indexOf(props[column])
+            : 0
+        const columnIndex_group = hGroup
+            ? columnPropValues_group.indexOf(props[hGroup])
             : 0
         const rowIndex_group = uniqueGroups.indexOf(
             JSON.stringify(getGroupProps(variant))
@@ -288,7 +290,7 @@ function organise(parameters: ParameterValues, spacing): string {
 
     function createSubGridColumnLabels(groupIndex) {
         columnPropValues_subGrid.forEach((value, i) => {
-            const label = createText(getLabelText(parameters["column"], value))
+            const label = createText(getLabelText(column, value))
             labelsParentFrame.appendChild(label)
             label.x = dx_subGrid * i + dx_group * groupIndex + spacing.subGrid
             label.y = -spacing.subGrid - label.height
@@ -297,7 +299,7 @@ function organise(parameters: ParameterValues, spacing): string {
 
     function createSubGridRowLabels(groupIndex) {
         rowPropValues_subGrid.forEach((value, i) => {
-            const label = createText(getLabelText(parameters["row"], value))
+            const label = createText(getLabelText(row, value))
             labelsParentFrame.appendChild(label)
             labels_subGridRows.push(label)
             label.y = dy_subGrid * i + dy_group * groupIndex + spacing.subGrid
@@ -307,17 +309,13 @@ function organise(parameters: ParameterValues, spacing): string {
     // Generate column labels
     if (columnPropValues_group) {
         columnPropValues_group.forEach((value, i) => {
-            const label = createText(
-                getLabelText(parameters["hGroup"], value),
-                20,
-                "Bold"
-            )
+            const label = createText(getLabelText(hGroup, value), 20, "Bold")
             labelsParentFrame.appendChild(label)
             label.x = dx_group * i + spacing.subGrid
             label.y = -spacing.groups - spacing.subGrid - label.height - 24 // allow 24 for height of sub-grid labels
             createSubGridColumnLabels(i)
         })
-    } else {
+    } else if (column) {
         createSubGridColumnLabels(0)
     }
 
