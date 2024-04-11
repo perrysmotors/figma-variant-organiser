@@ -1,14 +1,22 @@
 {
   "name": "variant-organiser",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Automatically arranges variants in a grid and creates property labels",
   "main": "code.js",
+  "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint ."
   },
   "author": "",
   "license": "",
   "devDependencies": {
-    "@figma/plugin-typings": "1.65.0"
+    "@figma/eslint-plugin-figma-plugins": "^0.15.0",
+    "@figma/plugin-typings": "^1.90.0",
+    "@typescript-eslint/eslint-plugin": "^7.6.0",
+    "@typescript-eslint/parser": "^7.6.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.4.5",
+    "typescript-eslint": "^7.6.0"
   }
 }
